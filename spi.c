@@ -5,10 +5,6 @@
 #include "main.h"
 #include "spi.h"
 
-uint32_t spiWord;
-uint16_t spiInts[2];
-char    *spiBytes;
-
 StatusRecU statusRec;
 #define STATUS_REC_IDLE  -2
 #define STATUS_REC_START -1
