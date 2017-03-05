@@ -18,10 +18,28 @@
 
 #include <xc.h>
 #include "mcu-cpu.h"
-#include "pins-b.h"
+#include "pins.h"
 #include "main.h"
 #include "spi.h"
 
+// note: 
+//    duty cycle max value is 255 but period is 256 cycles
+//    so it won't go to 100%, but that's OK since 12V is too high
+//    we could set period reg PR2 to 254 (255 cycle period) to get to 100%   
+void initPwm() {
+  // timer 2 -- input to pwm module
+  T2CON = 4;   // prescaler and postscaler set to 1:1, TMR2ON = 1
+  PR2 = 0x3F;  // period reg, 78.125 KHz -- see note above
+  
+  // pwm module 1
+  PWM_LAT  = 0; // start with pin low
+  PWM_TRIS = 0; // RC5 is output
+  PWM1DCL             = 0;  // d7-d6 are 2 lsb bits of duty cycle
+  PWM1DCH             = 0;  // d5-d0 are 6 msb bits, both set by spi commands
+  PWM1CONbits.PWM1OE  = 1;  // pwm output on RC5
+  PWM1CONbits.PWM1POL = 0;  // active-high
+  PWM1CONbits.PWM1EN  = 1;  // pwm enabled
+}
 
 void main(void) {
   INTCON = 0; // all ints off all the time
@@ -41,17 +59,3 @@ void main(void) {
   spiLoop(); // doesn't return
 }
 
-void initPwm() {
-  // timer 2 -- input to pwm module
-  T2CON = 4;   // prescaler and postscaler set to 1:1, TMR2ON = 1
-  PR2 = 0x3F;  // period reg, 78.12 KHz
-  
-  // pwm module 1
-  PWM_LAT  = 0; // start with pin low
-  PWM_TRIS = 0; // RC5 is output
-  PWM1DCL             = 0;  // d7-d6 are 2 lsb bits of duty cycle
-  PWM1DCH             = 0;  // d5-d0 are 6 msb bits, both set by spi commands
-  PWM1CONbits.PWM1OE  = 1;  // pwm output on RC5
-  PWM1CONbits.PWM1POL = 0;  // active-high
-  PWM1CONbits.PWM1EN  = 1;  // pwm enabled
-}

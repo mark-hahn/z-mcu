@@ -1,7 +1,7 @@
 
 #include <xc.h>
 #include "mcu-cpu.h"
-#include "pins-b.h"
+#include "pins.h"
 #include "main.h"
 #include "spi.h"
 
@@ -67,14 +67,16 @@ void initSpi() {
   SSP1CON1bits.SSPM  = 4; // mode: spi slave with slave select enabled
   SSP1STATbits.SMP   = 0; // input sample edge (must be zero for slave mode)
   SSP1CON1bits.CKP   = 0; // 0: xmit clk low is idle
-  SSP1STATbits.CKE   = 1; // in/out clk edge (1: active -> idle, high to low)
+  SSP1STATbits.CKE   = 1; // in/out clk edge (1: active -> idle, i.e. hi to lo)
   SSP1CON3bits.BOEN  = 0; // disable buffer input overflow check (SSPOV))
   
   /* From datasheet: Before enabling the module in SPI Slave mode, the clock
    line must match the proper Idle state (CKP) */
   while(SPI_CLK);
   
-  // start on byte boundary
+  // start on SS boundary
+  // note that SS is only used by HW to align bits and select slave
+  // it is not used for any kind of word-align since every SS pulse is 1-byte
   while(!SPI_SS);
   
   SSP1CON1bits.SSPOV = 0; // clear errors
@@ -83,6 +85,9 @@ void initSpi() {
   SSP1CON1bits.SSPEN = 1; // enable SPI
 }
 
+// note that a pair of Z_SET_CURx_CMD commands set a PWM duty cycle 8-bit value
+// duty is 0 to 255, 0% to (val/255)%
+// The PWM then sets the solenoid current to (cycle % * 12V / coil-resistance)
 void spiLoop() {
   while(1) {
     WCOL = 0;
@@ -91,11 +96,17 @@ void spiLoop() {
       char byte = SSP1BUF; // also clears BF
       switch (byte & 0xc0) {
         case Z_SET_CURL_CMD: 
-          PWM1DCL = byte << 6;   // d1-d0 of duty cycle are in d0-d1 of spi byte
+          // set solenoid current bottom 2 bits
+          // d1-d0 of duty cycle byte are in d1-d0 of spi byte
+          // and d7-d6 of register
+          PWM1DCL = byte << 6;   
           break;
           
         case Z_SET_CURH_CMD: 
-          PWM1DCH = byte & 0x3f; // d7-d2 of duty cycle are in d5-d0 of spi byte
+          // set solenoid current top 6 bits
+          // d7-d2 of duty cycle byte are in d5-d0 of spi byte
+          // and d5-d0 of register
+          PWM1DCH = byte & 0x3f; 
           break;
           
         default:
